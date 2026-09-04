@@ -1,0 +1,133 @@
+# TrendRadar 涉外监管与跨境风险情报关键词
+# 适用对象：跨国公司法务、涉外律师、出海企业合规人员
+# 设计原则：中英文并列；强调规则变化、执法动作和交易影响；单组限量控制日报长度。
+
+[GLOBAL_FILTER]
+星座
+彩票开奖
+双色球
+游戏攻略
+娱乐八卦
+明星恋情
+体育赛果
+
+[WORD_GROUPS]
+
+# 第一板块：制裁与出口管制
+
+[制裁清单重大变化]
+/SDN List|Specially Designated Nationals|Consolidated Sanctions List|UK Sanctions List|EU sanctions list|制裁清单|指定个人|指定实体|designation|designated person|delisting|移出制裁|资产冻结|asset freeze/
+@10
+
+[出口管制与实体清单]
+/export control|出口管制|Entity List|实体清单|Military End User|MEU List|Denied Persons List|Unverified List|UVL|Commerce Control List|CCL|两用物项|dual.use|管控名单|不可靠实体清单/
+@10
+
+[美国出口管制规则]
+/Export Administration Regulations|EAR|foreign direct product rule|FDPR|de minimis rule|ECCN|license exception|出口许可证|reexport|再出口|in.country transfer|最终用户|end.user control|BIS enforcement/
+@8
+
+[经济制裁规则与许可]
+/economic sanctions|financial sanctions|trade sanctions|restrictive measures|经济制裁|金融制裁|贸易制裁|限制性措施|general license|specific license|通用许可|特别许可|sanctions guidance|制裁指引/
+@8
+
+[制裁执法与规避]
+/sanctions enforcement|制裁执法|civil penalty|monetary penalty|行政罚款|sanctions evasion|规避制裁|circumvention|反规避|secondary sanctions|次级制裁|facilitation|making funds available|owned or controlled/
+@8
+
+# 第二板块：外资准入与国家安全审查
+
+[外国投资安全审查]
+/CFIUS|Committee on Foreign Investment|National Security and Investment Act|NSI Act|FDI screening|foreign investment screening|investment security review|外商投资安全审查|外资安全审查|国家安全审查|投资审查/
+@10
+
+[外资准入与负面清单]
+/foreign investment access|foreign investment negative list|外商投资准入|外资准入|负面清单|negative list|market access|市场准入|restricted sector|prohibited sector|股比限制|本地合作伙伴/
+@8
+
+[对外投资审查]
+/outbound investment|outbound investment screening|对外投资审查|境外投资审查|reverse CFIUS|notifiable transaction|prohibited transaction|covered transaction|受限交易|禁止交易|申报义务/
+@8
+
+[并购反垄断与经营者集中]
+/merger control|concentration review|经营者集中|并购审查|antitrust|competition law|反垄断|竞争法|conditional approval|附条件批准|gun jumping|抢跑|remedy commitment|救济承诺/
+@8
+
+[数据跨境与数字监管]
+/cross.border data|data transfer|数据出境|数据跨境|data localization|数据本地化|security assessment|安全评估|standard contractual clauses|SCC|标准合同|GDPR|PIPL|个人信息保护|Digital Services Act|Digital Markets Act|AI Act/
+@10
+
+[跨境反腐败执法]
+/FCPA|Foreign Corrupt Practices Act|FEPA|UK Bribery Act|foreign bribery|跨境商业贿赂|海外反腐|anti.bribery|DOJ enforcement|SEC enforcement|self.disclosure|主动披露|third.party intermediary|第三方中介/
+@8
+
+# 第三板块：国际贸易与供应链
+
+[反倾销反补贴与保障措施]
+/anti.dumping|countervailing|anti.subsidy|safeguard measure|反倾销|反补贴|保障措施|trade remedy|贸易救济|dumping margin|倾销幅度|subsidy investigation|补贴调查|injury determination|损害裁定/
+@10
+
+[关税海关与原产地]
+/tariff|关税|customs enforcement|海关执法|rules of origin|原产地规则|country of origin|原产国|customs valuation|海关估价|import ban|进口禁令|export ban|出口禁令|transshipment|转运/
+@8
+
+[强迫劳动与供应链尽调]
+/UFLPA|Uyghur Forced Labor Prevention Act|forced labor|强迫劳动|withhold release order|WRO|供应链尽调|supply.chain due diligence|human rights due diligence|人权尽调|traceability|可追溯|entity list addition/
+@8
+
+[产业补贴与本地化要求]
+/industrial subsidy|产业补贴|local content requirement|本地含量|domestic content|本国产品要求|state aid|国家援助|critical raw materials|关键原材料|economic security|经济安全|strategic autonomy|战略自主/
+@8
+
+[供应链中断与地缘经济]
+/supply chain disruption|供应链中断|supply chain resilience|供应链韧性|economic coercion|经济胁迫|trade restriction|贸易限制|technology blockade|技术封锁|decoupling|脱钩|de.risking|去风险化|friend.shoring|友岸外包/
+@8
+
+[WTO规则与争端]
+/WTO dispute|WTO panel|Dispute Settlement Body|DSB|request for consultations|磋商请求|世贸争端|WTO争端|panel report|专家组报告|Appellate Body|上诉机构|TRIMS|SCM Agreement|TBT Agreement|GATS/
+@8
+
+# 第四板块：国际争端与域外执法
+
+[投资仲裁与ISDS]
+/ICSID|ISDS|investor.state dispute|investor.State arbitration|投资仲裁|投资者与国家争端|bilateral investment treaty|BIT|双边投资协定|fair and equitable treatment|公平与公正待遇|expropriation|征收|jurisdictional objection|管辖权异议/
+@10
+
+[国际仲裁规则与案件]
+/UNCITRAL Arbitration Rules|ICC Arbitration|SIAC|HKIAC|LCIA|SCC Arbitration|PCA arbitration|Permanent Court of Arbitration|国际仲裁|仲裁规则|emergency arbitrator|紧急仲裁员|expedited procedure|快速程序/
+@8
+
+[仲裁裁决承认与执行]
+/New York Convention|纽约公约|recognition and enforcement|承认与执行|set aside award|撤销裁决|annulment|撤销程序|public policy exception|公共政策例外|refusal of enforcement|拒绝执行|anti.suit injunction|禁诉令/
+@8
+
+[域外管辖与长臂执法]
+/extraterritorial jurisdiction|域外管辖|long.arm jurisdiction|长臂管辖|blocking statute|阻断法|foreign subpoena|境外传票|cross.border investigation|跨境调查|deferred prosecution agreement|DPA|non.prosecution agreement|NPA/
+@8
+
+[跨境诉讼与司法协助]
+/cross.border litigation|跨境诉讼|service abroad|域外送达|Hague Service Convention|海牙送达公约|taking of evidence abroad|域外取证|Hague Evidence Convention|海牙取证公约|foreign judgment|外国判决|judicial assistance|司法协助/
+@8
+
+# 综合预警：规则变化和企业影响
+
+[监管立法状态变化]
+/proposed rule|draft regulation|征求意见稿|规则草案|interim final rule|临时最终规则|final rule|最终规则|effective date|生效日期|implementation guidance|实施指引|public consultation|公开征求意见|regulatory update|监管更新/
+@10
+
+[重大调查处罚与禁令]
+/investigation launched|立案调查|enforcement action|执法行动|civil penalty|criminal penalty|行政处罚|刑事处罚|settlement agreement|和解协议|consent order|禁令|injunction|license revoked|吊销许可|business suspension|停业/
+@10
+
+[中国企业出海风险]
++/China|Chinese|PRC|中国|中资|中国企业|中国制造|中国供应商/
+/sanction|export control|tariff|anti.dumping|countervailing|foreign investment review|forced labor|data transfer|investigation|制裁|出口管制|关税|反倾销|反补贴|投资审查|强迫劳动|数据跨境|调查/
+@12
+
+[地缘政治风险信号]
+/geopolitical risk|地缘政治风险|armed conflict|武装冲突|trade war|贸易战|diplomatic tension|外交紧张|regime change|政权更迭|state of emergency|紧急状态|border closure|边境关闭|shipping disruption|航运中断|maritime security|海上安全/
+@8
+
+[跨国公司法务行动]
+/general counsel|chief legal officer|in.house counsel|跨国公司法务|总法律顾问|compliance program|合规体系|risk assessment|风险评估|internal investigation|内部调查|third.party due diligence|第三方尽调|contract remediation|合同整改|business continuity|业务连续性/
+@8
