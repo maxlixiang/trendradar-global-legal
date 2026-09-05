@@ -1102,9 +1102,14 @@ class NewsAnalyzer:
         now = self.ctx.get_time()
         print(f"当前北京时间: {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
-        if not self.ctx.config["ENABLE_CRAWLER"]:
-            print("爬虫功能已禁用（ENABLE_CRAWLER=False），程序退出")
-            return False
+        hotlist_enabled = self.ctx.config["ENABLE_CRAWLER"]
+        rss_enabled = self.ctx.rss_enabled
+        if not hotlist_enabled and not rss_enabled:
+            print("热榜与 RSS 采集均已禁用；仍允许 report-only 读取历史数据")
+        elif not hotlist_enabled:
+            print("热榜采集已禁用，将继续运行 RSS-only 模式")
+        elif not rss_enabled:
+            print("RSS 采集已禁用，将继续运行热榜模式")
 
         has_notification = self._has_notification_configured()
         if not self.ctx.config["ENABLE_NOTIFICATION"]:
@@ -1118,6 +1123,30 @@ class NewsAnalyzer:
         print(f"报告模式: {self.report_mode}")
         print(f"运行模式: {mode_strategy['description']}")
         return True
+
+    def _collect_enabled_sources(
+        self,
+    ) -> Tuple[
+        Dict, Dict, List,
+        Optional[List[Dict]], Optional[List[Dict]], Optional[List[Dict]], set,
+    ]:
+        """仅采集配置中启用的数据源，允许热榜或 RSS 独立运行。"""
+        if self.ctx.config["ENABLE_CRAWLER"]:
+            results, id_to_name, failed_ids = self._crawl_data()
+        else:
+            print("[采集] 跳过热榜：platforms.enabled=false")
+            results, id_to_name, failed_ids = {}, {}, []
+
+        if self.ctx.rss_enabled:
+            rss_items, rss_new_items, raw_rss_items, rss_new_urls = self._crawl_rss_data()
+        else:
+            print("[采集] 跳过 RSS：rss.enabled=false")
+            rss_items, rss_new_items, raw_rss_items, rss_new_urls = None, None, None, set()
+
+        return (
+            results, id_to_name, failed_ids,
+            rss_items, rss_new_items, raw_rss_items, rss_new_urls,
+        )
 
     def _crawl_data(self) -> Tuple[Dict, Dict, List]:
         """执行数据爬取"""
@@ -1827,8 +1856,10 @@ class NewsAnalyzer:
 
             if collect_only:
                 print("[运行模式] 仅采集：保存热榜与 RSS，不生成或推送报告")
-                self._crawl_data()
-                self._crawl_rss_data()
+                if not self.ctx.config["ENABLE_CRAWLER"] and not self.ctx.rss_enabled:
+                    print("[采集] 热榜与 RSS 均已禁用，无可执行的数据源")
+                    return
+                self._collect_enabled_sources()
                 return
 
             # RSS 会在主分析流水线之前按报告模式取数，因此必须先解析时间线，
@@ -1877,11 +1908,11 @@ class NewsAnalyzer:
                 )
                 return
 
-            # 抓取热榜数据
-            results, id_to_name, failed_ids = self._crawl_data()
-
-            # 抓取 RSS 数据（如果启用），返回统计条目、新增条目和原始条目
-            rss_items, rss_new_items, raw_rss_items, rss_new_urls = self._crawl_rss_data()
+            # 只抓取已启用的数据源；支持热榜-only、RSS-only 或两者同时启用。
+            (
+                results, id_to_name, failed_ids,
+                rss_items, rss_new_items, raw_rss_items, rss_new_urls,
+            ) = self._collect_enabled_sources()
 
             # 执行模式策略，传递 RSS 数据用于合并推送
             self._execute_mode_strategy(
