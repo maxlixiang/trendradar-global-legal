@@ -24,7 +24,8 @@
 @10
 
 [美国出口管制规则]
-/Export Administration Regulations|EAR|foreign direct product rule|FDPR|de minimis rule|ECCN|license exception|出口许可证|reexport|再出口|in.country transfer|最终用户|end.user control|BIS enforcement/
+# 缩写采用英文字符边界，避免 EAR 误匹配 year、hearing、earlier 等词；仍兼容“EAR出口管制”这类中英混排标题。
+/Export Administration Regulations|(?<![A-Za-z])EAR(?![A-Za-z])|foreign direct product rule|FDPR|de minimis rule|ECCN|license exception|出口许可证|reexport|再出口|in.country transfer|最终用户|end.user control|BIS enforcement/
 @8
 
 [经济制裁规则与许可]

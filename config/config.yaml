@@ -258,18 +258,19 @@ rss:
       max_age_days: 3
       max_items: 40
 
-    # D. 仍待网页转 RSS 的官方来源
-    # 生成订阅地址后替换 url，并将 enabled 改为 true。
+    # D. 已验证的官方网页转 RSS 源
 
     - id: "us-bis-federal-register"
-      name: "US BIS Federal Register Notices"
-      url: "https://www.bis.gov/regulations/federal-register-notices"
-      enabled: false
+      name: "美国商务部工业与安全局 - Federal Register Notices"
+      url: "https://rss.cnnewsnow.com/bis/federal-register-notices"
+      max_age_days: 7
+      max_items: 30
 
     - id: "us-cfius"
-      name: "US CFIUS"
-      url: "https://home.treasury.gov/policy-issues/international/the-committee-on-foreign-investment-in-the-united-states-cfius/"
-      enabled: false
+      name: "美国海外投资委员会 - Press Releases"
+      url: "https://rss.cnnewsnow.com/cfius/press-releases"
+      max_age_days: 7
+      max_items: 20
 
     - id: "us-doj-fcpa"
       name: "US DOJ FCPA Enforcement Actions"
@@ -281,10 +282,23 @@ rss:
       url: "https://policy.trade.ec.europa.eu/enforcement-and-protection/investment-screening_en"
       enabled: false
 
-    - id: "eu-eurlex-alerts"
-      name: "EUR-Lex Saved Search Alerts"
-      url: "https://eur-lex.europa.eu/"
-      enabled: false
+    - id: "eurlex-official-journal-l"
+      name: "EUR-Lex Official Journal L Series"
+      url: "https://rss.cnnewsnow.com/eurlex/l"
+      max_age_days: 3
+      max_items: 30
+
+    - id: "eurlex-official-journal-c"
+      name: "EUR-Lex Official Journal C Series"
+      url: "https://rss.cnnewsnow.com/eurlex/c"
+      max_age_days: 3
+      max_items: 30
+
+    - id: "govuk-international-news"
+      name: "英国政府官网 - International News"
+      url: "https://rss.cnnewsnow.com/govuk/international"
+      max_age_days: 3
+      max_items: 30
 
     - id: "uk-sanctions-list"
       name: "UK Sanctions List"
@@ -292,14 +306,19 @@ rss:
       enabled: false
 
     - id: "icsid-cases"
-      name: "ICSID Cases and Decisions"
-      url: "https://icsid.worldbank.org/cases/case-database"
-      enabled: false
+      name: "ICSID - Recent Registered Cases"
+      url: "https://rss.cnnewsnow.com/icsid/recent"
+      max_age_days: 14
+      max_items: 20
 
     - id: "uncitral-transparency"
-      name: "UNCITRAL Transparency Registry"
-      url: "https://uncitral.un.org/en/transparencyregistry"
-      enabled: false
+      name: "UNCITRAL - Events and News"
+      url: "https://rss.cnnewsnow.com/uncitral/events-news"
+      max_age_days: 14
+      max_items: 20
+
+    # E. 仍待网页转 RSS 的官方来源
+    # 生成订阅地址后替换 url，并将 enabled 改为 true。
 
     - id: "pca-cases"
       name: "Permanent Court of Arbitration Cases"
