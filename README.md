@@ -12,10 +12,10 @@
 ## 当前运行策略
 
 - 时区：`Asia/Shanghai`。
-- 采集：Docker每30分钟运行一次，全天静默采集。
-- 日报：每天北京时间08:30—09:30窗口内只生成和推送一次。
-- 统计期间：昨天00:00—23:59（北京时间），由 `report.date_offset_days: 1` 实现。
-- AI：使用DeepSeek，只有日报窗口执行分析；夜间不重复调用AI。
+- 采集：Docker在每小时 `00/30` 分运行，仅采集并落库。
+- 日报：每天北京时间08:05生成并推送一次（时间线窗口为08:05—08:35）。
+- 统计期间：执行时刻向前24小时；定时执行通常为昨天08:05至今天08:05。
+- AI：暂未配置DeepSeek API，当前关闭AI分析，只做关键词筛选与汇总。
 - 热榜：关闭，只分析专业RSS，减少社会新闻噪声。
 - 启动即运行：关闭，避免部署时误推送。
 
@@ -23,7 +23,7 @@
 
 | 项目 | 知识产权实例 | 本实例 |
 |---|---|---|
-| 本地目录 | `TrendRadar` | `TrendRadar-Global` |
+| 本地目录 | `TrendRadar-IP-Cousel` | `TrendRadar-Global-Legal` |
 | 主容器 | `trendradar` | `trendradar-global` |
 | MCP容器 | `trendradar-mcp` | `trendradar-global-mcp` |
 | Web端口 | 8080 | 8081 |
@@ -33,10 +33,10 @@
 
 ## 关键配置文件
 
-- `config/config.yaml`：数据源、昨天自然日统计、报告长度和AI开关。
+- `config/config.yaml`：数据源、滚动24小时统计、报告长度和AI开关。
 - `config/frequency_words.txt`：涉外监管关键词与优先级。
 - `config/ai_analysis_prompt.txt`：跨国公司涉外风险分析提示词。
-- `config/timeline.yaml`：北京时间08:30日报窗口。
+- `config/timeline.yaml`：北京时间08:05日报窗口。
 - `docker/.env`：飞书、DeepSeek、端口与运行方式。
 - `docker/docker-compose.yml`：使用官方镜像部署。
 - `docker/docker-compose-build.yml`：需要使用本地代码构建时使用。
@@ -113,11 +113,15 @@ EUR-Lex建议分别建立保存检索并生成RSS，不要只建立一个全站�
 
 ```dotenv
 FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/新群机器人地址
-AI_ANALYSIS_ENABLED=true
+AI_ANALYSIS_ENABLED=false
 AI_API_KEY=你的DeepSeek_API_Key
 AI_MODEL=deepseek/deepseek-v4-flash
 AI_API_BASE=https://api.deepseek.com
+CRON_SCHEDULE=*/30 * * * *
+REPORT_CRON_SCHEDULE=5 8 * * *
 ```
+
+容器会生成两条独立任务：`--collect-only` 在整点和半点采集，`--report-only` 在08:05读取已存储数据并推送。报告任务本身不再采集；手动以 `RUN_MODE=once` 完整执行时，仍会先采集并按实际执行时刻向前汇总24小时。
 
 复制目录时保留了DeepSeek模型名称和接口地址，但当前API Key及新飞书Webhook均为空。部署前必须分别填写。
 
@@ -159,7 +163,7 @@ docker compose up -d trendradar
 ## 部署前检查
 
 1. 新飞书群机器人Webhook已经填写。
-2. DeepSeek API Key有效，模型名称与账户实际支持的模型一致。
+2. 当前无需 DeepSeek API Key；启用AI前再核对Key、模型名称和账户支持情况。
 3. `docker compose config`没有YAML错误。
 4. 8081和3334没有被VPS其他服务占用。
 5. 所有网页转换RSS均能返回合法XML，并至少包含标题、链接和发布日期。

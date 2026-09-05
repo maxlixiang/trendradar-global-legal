@@ -9,9 +9,11 @@ TrendRadar 主程序
 import argparse
 import os
 import webbrowser
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+import pytz
 
 from trendradar.context import AppContext
 from trendradar import __version__
@@ -68,6 +70,7 @@ class NewsAnalyzer:
         self.request_interval = self.ctx.config["REQUEST_INTERVAL"]
         self.report_mode = self.ctx.config["REPORT_MODE"]
         self.report_date_offset_days = self.ctx.config.get("REPORT_DATE_OFFSET_DAYS", 0)
+        self.report_window_hours = self.ctx.config.get("REPORT_WINDOW_HOURS", 0)
         self.frequency_file = None
         self.filter_method = None  # None=使用全局配置 ctx.filter_method
         self.interests_file = None  # None=使用全局配置 ai_filter.interests_file
@@ -158,7 +161,12 @@ class NewsAnalyzer:
         strategy = dict(
             self.MODE_STRATEGIES.get(self.report_mode, self.MODE_STRATEGIES["daily"])
         )
-        if self.report_mode == "daily" and self.report_date_offset_days > 0:
+        if self.report_mode == "daily" and self.report_window_hours > 0:
+            window_start, window_end = self._get_report_window()
+            window_text = self._format_report_window(window_start, window_end)
+            strategy["report_type"] = f"过去 {self.report_window_hours} 小时汇总（北京时间）"
+            strategy["description"] = f"滚动时间窗汇总模式（北京时间 {window_text}）"
+        elif self.report_mode == "daily" and self.report_date_offset_days > 0:
             report_date = self._get_report_date()
             strategy["report_type"] = f"{report_date} 全天汇总（北京时间）"
             strategy["description"] = (
@@ -170,6 +178,148 @@ class NewsAnalyzer:
         """返回 daily 模式应读取的数据日期。"""
         target = self.ctx.get_time().date() - timedelta(days=self.report_date_offset_days)
         return target.isoformat()
+
+    def _get_report_window(self) -> Tuple[datetime, datetime]:
+        """返回以本次实际执行时刻为终点的滚动报告窗口。"""
+        window_end = self.ctx.get_time().replace(second=0, microsecond=0)
+        return window_end - timedelta(hours=self.report_window_hours), window_end
+
+    @staticmethod
+    def _format_report_window(window_start: datetime, window_end: datetime) -> str:
+        return f"{window_start:%Y-%m-%d %H:%M}—{window_end:%Y-%m-%d %H:%M}"
+
+    def _parse_window_time(self, date_str: str, time_str: str) -> Optional[datetime]:
+        """把数据库中的日期和 HH-MM/HH:MM 时间组合为配置时区时间。"""
+        if not time_str:
+            return None
+        value = str(time_str).strip()
+        try:
+            if len(value) >= 10 and value[4] == "-" and value[7] == "-":
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                if parsed.tzinfo is not None:
+                    return parsed.astimezone(pytz.timezone(self.ctx.timezone))
+                naive = parsed
+            else:
+                normalized = value[:5].replace("-", ":")
+                naive = datetime.strptime(f"{date_str} {normalized}", "%Y-%m-%d %H:%M")
+            return pytz.timezone(self.ctx.timezone).localize(naive)
+        except (TypeError, ValueError, pytz.UnknownTimeZoneError):
+            return None
+
+    def _load_rolling_window_data(
+        self, quiet: bool = False
+    ) -> Optional[Tuple[Dict, Dict, Dict, Dict, List, List]]:
+        """合并并裁剪跨自然日数据库，只保留 (开始时刻, 执行时刻] 的热榜记录。"""
+        window_start, window_end = self._get_report_window()
+        all_results: Dict = {}
+        id_to_name: Dict = {}
+        title_info: Dict = {}
+
+        current_date = window_start.date()
+        while current_date <= window_end.date():
+            date_str = current_date.isoformat()
+            day_results, day_names, day_info = self.ctx.read_today_titles(
+                self.ctx.platform_ids, quiet=True, date=date_str
+            )
+            id_to_name.update(day_names)
+
+            for source_id, titles in day_results.items():
+                for title, title_data in titles.items():
+                    meta = day_info.get(source_id, {}).get(title, {})
+                    observations = []
+                    for point in meta.get("rank_timeline", []) or []:
+                        observed_at = self._parse_window_time(date_str, point.get("time", ""))
+                        rank = point.get("rank")
+                        if observed_at and window_start < observed_at <= window_end and rank is not None:
+                            observations.append((observed_at, rank))
+
+                    if not observations:
+                        observed_at = self._parse_window_time(
+                            date_str, meta.get("last_time") or meta.get("first_time", "")
+                        )
+                        ranks = meta.get("ranks") or title_data.get("ranks") or []
+                        if observed_at and window_start < observed_at <= window_end and ranks:
+                            observations.append((observed_at, ranks[-1]))
+
+                    if not observations:
+                        continue
+
+                    source_results = all_results.setdefault(source_id, {})
+                    source_info = title_info.setdefault(source_id, {})
+                    existing = source_info.get(title)
+                    if existing is None:
+                        existing = {
+                            "first_time": observations[0][0].strftime("%m-%d %H:%M"),
+                            "last_time": observations[-1][0].strftime("%m-%d %H:%M"),
+                            "count": 0,
+                            "ranks": [],
+                            "url": title_data.get("url", ""),
+                            "mobileUrl": title_data.get("mobileUrl", ""),
+                            "rank_timeline": [],
+                        }
+                        source_info[title] = existing
+
+                    for observed_at, rank in observations:
+                        if rank not in existing["ranks"]:
+                            existing["ranks"].append(rank)
+                        existing["rank_timeline"].append({
+                            "time": observed_at.strftime("%m-%d %H:%M"),
+                            "rank": rank,
+                        })
+                    existing["count"] += len(observations)
+                    existing["last_time"] = observations[-1][0].strftime("%m-%d %H:%M")
+                    source_results[title] = {
+                        "ranks": existing["ranks"],
+                        "url": existing["url"],
+                        "mobileUrl": existing["mobileUrl"],
+                    }
+
+            current_date += timedelta(days=1)
+
+        if not all_results:
+            print(f"滚动窗口 {self._format_report_window(window_start, window_end)} 没有热榜数据")
+            return None
+
+        if not quiet:
+            total_titles = sum(len(titles) for titles in all_results.values())
+            print(
+                f"读取到 {total_titles} 个滚动窗口标题（北京时间 "
+                f"{self._format_report_window(window_start, window_end)}）"
+            )
+        word_groups, filter_words, global_filters = self.ctx.load_frequency_words(self.frequency_file)
+        return all_results, id_to_name, title_info, {}, word_groups, filter_words, global_filters
+
+    def _parse_rss_published_time(self, value: str) -> Optional[datetime]:
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = pytz.UTC.localize(parsed)
+            return parsed.astimezone(pytz.timezone(self.ctx.timezone))
+        except (TypeError, ValueError, pytz.UnknownTimeZoneError):
+            return None
+
+    def _load_rolling_rss_items(self) -> List[Dict]:
+        """读取跨日 RSS 数据，按发布时间筛选滚动窗口并去重。"""
+        window_start, window_end = self._get_report_window()
+        selected = {}
+        current_date = window_start.date()
+        while current_date <= window_end.date():
+            date_str = current_date.isoformat()
+            rss_data = self.storage_manager.get_rss_data(date_str)
+            if rss_data:
+                for item in self._convert_rss_items_to_list(rss_data.items, rss_data.id_to_name):
+                    published_at = self._parse_rss_published_time(item.get("published_at", ""))
+                    if published_at is None:
+                        published_at = self._parse_window_time(
+                            date_str, item.get("first_time") or item.get("last_time", "")
+                        )
+                    if published_at and window_start < published_at <= window_end:
+                        key = item.get("url") or f"{item.get('feed_id', '')}\0{item.get('title', '')}"
+                        selected[key] = item
+            current_date += timedelta(days=1)
+        return sorted(selected.values(), key=lambda item: item.get("published_at", ""), reverse=True)
 
     def _has_notification_configured(self) -> bool:
         """检查是否配置了任何通知渠道"""
@@ -270,8 +420,11 @@ class NewsAnalyzer:
 
             elif ai_mode in ["daily", "current"]:
                 # 加载历史数据
-                target_date = self._get_report_date() if ai_mode == "daily" else None
-                analysis_data = self._load_analysis_data(quiet=True, date=target_date)
+                if ai_mode == "daily" and self.report_window_hours > 0:
+                    analysis_data = self._load_rolling_window_data(quiet=True)
+                else:
+                    target_date = self._get_report_date() if ai_mode == "daily" else None
+                    analysis_data = self._load_analysis_data(quiet=True, date=target_date)
                 if not analysis_data:
                     print(f"[AI] 无法加载历史数据用于 {ai_mode} 模式分析")
                     return [], None
@@ -1148,6 +1301,7 @@ class NewsAnalyzer:
         raw_rss_items = None  # 原始 RSS 条目列表（用于独立展示区）
         rss_new_urls = set()  # 原始新增 RSS URLs（未经关键词过滤）
 
+        is_rolling_daily = self.report_mode == "daily" and self.report_window_hours > 0
         report_date = self._get_report_date() if self.report_mode == "daily" else rss_data.date
         is_historical_daily = self.report_mode == "daily" and report_date != rss_data.date
 
@@ -1162,9 +1316,12 @@ class NewsAnalyzer:
             if latest_data:
                 raw_rss_items = self._convert_rss_items_to_list(latest_data.items, latest_data.id_to_name)
         else:  # daily
-            all_data = self.storage_manager.get_rss_data(report_date)
-            if all_data:
-                raw_rss_items = self._convert_rss_items_to_list(all_data.items, all_data.id_to_name)
+            if is_rolling_daily:
+                raw_rss_items = self._load_rolling_rss_items()
+            else:
+                all_data = self.storage_manager.get_rss_data(report_date)
+                if all_data:
+                    raw_rss_items = self._convert_rss_items_to_list(all_data.items, all_data.id_to_name)
 
         # 如果 RSS 展示未启用，跳过关键词分析，只返回原始条目用于独立展示区
         if not rss_display_enabled:
@@ -1173,7 +1330,8 @@ class NewsAnalyzer:
         # 2. 获取新增条目（用于统计）
         # 历史日报不把今天新抓取的 RSS 混入昨天的数据。
         new_items_dict = (
-            {} if is_historical_daily else self.storage_manager.detect_new_rss_items(rss_data)
+            {} if is_historical_daily or is_rolling_daily
+            else self.storage_manager.detect_new_rss_items(rss_data)
         )
         new_items_list = None
         if new_items_dict:
@@ -1344,6 +1502,8 @@ class NewsAnalyzer:
                     "published_at": item.published_at,
                     "summary": item.summary,
                     "author": item.author,
+                    "first_time": item.first_time,
+                    "last_time": item.last_time,
                 })
 
         # 输出过滤统计
@@ -1516,11 +1676,18 @@ class NewsAnalyzer:
                 print("❌ 严重错误：无法读取刚保存的数据文件")
                 raise RuntimeError("数据一致性检查失败：保存后立即读取失败")
         elif self.report_mode == "daily":
-            # daily 模式：按配置读取目标自然日的数据。
-            # date_offset_days=1 时，上午推送昨天北京时间 00:00-23:59 的完整采集结果。
-            report_date = self._get_report_date()
-            print(f"daily 模式：读取北京时间 {report_date} 的完整自然日数据")
-            analysis_data = self._load_analysis_data(date=report_date)
+            if self.report_window_hours > 0:
+                window_start, window_end = self._get_report_window()
+                print(
+                    f"daily 模式：读取过去 {self.report_window_hours} 小时数据（北京时间 "
+                    f"{self._format_report_window(window_start, window_end)}）"
+                )
+                analysis_data = self._load_rolling_window_data()
+                report_date = None
+            else:
+                report_date = self._get_report_date()
+                print(f"daily 模式：读取北京时间 {report_date} 的完整自然日数据")
+                analysis_data = self._load_analysis_data(date=report_date)
             if analysis_data:
                 (
                     all_results,
@@ -1562,7 +1729,13 @@ class NewsAnalyzer:
             else:
                 # 目标历史日没有热榜数据时，不得回退并混入今天的抓取结果；
                 # 仍继续处理目标日期的 RSS（如果存在）。
-                if self.report_date_offset_days > 0:
+                if self.report_window_hours > 0:
+                    print("滚动24小时窗口没有热榜数据，不回退到窗口外数据")
+                    results = {}
+                    id_to_name = {}
+                    new_titles = {}
+                    title_info = {}
+                elif self.report_date_offset_days > 0:
                     print(f"{report_date} 没有热榜数据，不回退到当天数据")
                     results = {}
                     id_to_name = {}
@@ -1646,17 +1819,63 @@ class NewsAnalyzer:
 
         return html_file
 
-    def run(self) -> None:
+    def run(self, collect_only: bool = False, report_only: bool = False) -> None:
         """执行分析流程"""
         try:
             if not self._initialize_and_check_config():
                 return
 
+            if collect_only:
+                print("[运行模式] 仅采集：保存热榜与 RSS，不生成或推送报告")
+                self._crawl_data()
+                self._crawl_rss_data()
+                return
+
             # RSS 会在主分析流水线之前按报告模式取数，因此必须先解析时间线，
             # 避免在非推送时段或历史日报场景下读取错误日期。
             schedule = self.ctx.create_scheduler().resolve()
+            if report_only:
+                schedule.collect = True
+                schedule.push = True
+                schedule.analyze = self.ctx.config.get("AI_ANALYSIS", {}).get("ENABLED", False)
+                schedule.report_mode = self.ctx.config.get("REPORT_MODE", "daily")
+                schedule.ai_mode = "daily"
+                schedule.once_push = False
+                schedule.once_analyze = False
+                schedule.period_key = None
+                schedule.period_name = "定时报告"
+                print("[运行模式] 仅报告：使用已存储数据，不执行采集")
+            if os.environ.get("RUN_MODE", "").lower() == "once":
+                # 手动单次执行以实际执行时刻为窗口终点，并立即生成、推送报告。
+                schedule.collect = True
+                schedule.push = True
+                schedule.analyze = self.ctx.config.get("AI_ANALYSIS", {}).get("ENABLED", False)
+                schedule.report_mode = self.ctx.config.get("REPORT_MODE", "daily")
+                schedule.ai_mode = "daily"
+                schedule.once_push = False
+                schedule.once_analyze = False
+                schedule.period_key = None
+                schedule.period_name = "手动执行"
+                print("[调度] RUN_MODE=once：按实际执行时刻生成并推送滚动报告")
             self.report_mode = schedule.report_mode
             mode_strategy = self._get_mode_strategy()
+
+            if report_only:
+                from types import SimpleNamespace
+
+                placeholder_rss_data = SimpleNamespace(
+                    date=self.ctx.format_date(), id_to_name={}, items={}
+                )
+                rss_items, rss_new_items, raw_rss_items, rss_new_urls = (
+                    self._process_rss_data_by_mode(placeholder_rss_data)
+                )
+                self._execute_mode_strategy(
+                    mode_strategy, {}, {}, [],
+                    rss_items=rss_items, rss_new_items=rss_new_items,
+                    raw_rss_items=raw_rss_items, rss_new_urls=rss_new_urls,
+                    schedule=schedule,
+                )
+                return
 
             # 抓取热榜数据
             results, id_to_name, failed_ids = self._crawl_data()
@@ -1689,6 +1908,9 @@ def main():
         epilog="""
 调度状态命令:
   --show-schedule        显示当前调度状态（时间段、行为开关）
+运行模式命令:
+  --collect-only         只采集并保存数据，不生成或推送报告
+  --report-only          只用已存储数据生成并推送报告，不执行采集
 诊断命令:
   --doctor               运行环境与配置体检
   --test-notification    发送测试通知到已配置渠道
@@ -1696,15 +1918,22 @@ def main():
 示例:
   python -m trendradar                    # 正常运行
   python -m trendradar --show-schedule    # 查看当前调度状态
+  python -m trendradar --collect-only     # 定时采集
+  python -m trendradar --report-only      # 定时报告
   python -m trendradar --doctor           # 运行一键体检
   python -m trendradar --test-notification # 测试通知渠道连通性
 """
     )
     parser.add_argument("--show-schedule", action="store_true", help="显示当前调度状态")
+    parser.add_argument("--collect-only", action="store_true", help="只采集数据，不生成或推送报告")
+    parser.add_argument("--report-only", action="store_true", help="只用已存储数据生成并推送报告")
     parser.add_argument("--doctor", action="store_true", help="运行环境与配置体检")
     parser.add_argument("--test-notification", action="store_true", help="发送测试通知到已配置渠道")
 
     args = parser.parse_args()
+
+    if args.collect_only and args.report_only:
+        parser.error("--collect-only 与 --report-only 不能同时使用")
 
     debug_mode = False
     try:
@@ -1743,7 +1972,7 @@ def main():
             }
 
         debug_mode = analyzer.ctx.config.get("DEBUG", False)
-        analyzer.run()
+        analyzer.run(collect_only=args.collect_only, report_only=args.report_only)
     except FileNotFoundError as e:
         print(f"❌ 配置文件错误: {e}")
         print("\n请确保以下文件存在:")

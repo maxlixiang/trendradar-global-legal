@@ -54,6 +54,7 @@ services:
       - S3_REGION=${S3_REGION:-}
       # 运行模式
       - CRON_SCHEDULE=${CRON_SCHEDULE:-*/30 * * * *}
+      - REPORT_CRON_SCHEDULE=${REPORT_CRON_SCHEDULE:-5 8 * * *}
       - RUN_MODE=${RUN_MODE:-cron}
       - IMMEDIATE_RUN=${IMMEDIATE_RUN:-true}
 

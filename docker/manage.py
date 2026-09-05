@@ -137,6 +137,7 @@ def show_status():
 
     # 检查环境变量
     cron_schedule = os.environ.get("CRON_SCHEDULE", "未设置")
+    report_cron_schedule = os.environ.get("REPORT_CRON_SCHEDULE", "未设置")
     run_mode = os.environ.get("RUN_MODE", "未设置")
     immediate_run = os.environ.get("IMMEDIATE_RUN", "未设置")
     
@@ -145,7 +146,9 @@ def show_status():
     
     # 解析并显示cron表达式的含义
     cron_description = parse_cron_schedule(cron_schedule)
-    print(f"    ⏰ 执行频率: {cron_description}")
+    print(f"    ⏰ 采集频率: {cron_description}")
+    print(f"    REPORT_CRON_SCHEDULE: {report_cron_schedule}")
+    print(f"    📨 报告频率: {parse_cron_schedule(report_cron_schedule)}")
     
     print(f"    RUN_MODE: {run_mode}")
     print(f"    IMMEDIATE_RUN: {immediate_run}")
@@ -267,6 +270,7 @@ def show_config():
     env_vars = [
         # 运行配置
         "CRON_SCHEDULE",
+        "REPORT_CRON_SCHEDULE",
         "RUN_MODE",
         "IMMEDIATE_RUN",
         # 通知渠道
